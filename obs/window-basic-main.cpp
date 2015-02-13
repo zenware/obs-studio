@@ -25,6 +25,7 @@
 #include <QFileDialog>
 #include <QNetworkRequest>
 #include <QNetworkReply>
+#include <QDataStream>
 
 #include <util/dstr.h>
 #include <util/util.hpp>
@@ -114,6 +115,9 @@ OBSBasic::OBSBasic(QWidget *parent)
 	qRegisterMetaType<OBSSceneItem>("OBSSceneItem");
 	qRegisterMetaType<OBSSource>   ("OBSSource");
 
+	qRegisterMetaTypeStreamOperators<OBSSceneItem>("OBSSceneItem");
+	qMetaTypeId<OBSSceneItem>();
+
 	connect(windowHandle(), &QWindow::screenChanged, [this]() {
 		struct obs_video_info ovi;
 
@@ -141,6 +145,18 @@ OBSBasic::OBSBasic(QWidget *parent)
 			SLOT(SceneItemNameEdited(QWidget*,
 					QAbstractItemDelegate::EndEditHint)));
 
+	connect(ui->scenes->model(), SIGNAL(
+			rowsMoved(QModelIndex, int, int, QModelIndex, int)),
+			this,
+			SLOT(on_actionSceneDragReorder(QModelIndex, int, int,
+			QModelIndex, int)));
+
+	connect(ui->sources->model(), SIGNAL(
+			rowsMoved(QModelIndex, int, int, QModelIndex, int)),
+			this,
+			SLOT(on_actionSourceDragReorder(QModelIndex, int, int,
+			QModelIndex, int)));
+
 	cpuUsageInfo = os_cpu_usage_info_start();
 	cpuUsageTimer = new QTimer(this);
 	connect(cpuUsageTimer, SIGNAL(timeout()),
@@ -160,6 +176,20 @@ OBSBasic::OBSBasic(QWidget *parent)
 	ui->action_Settings->setMenuRole(QAction::PreferencesRole);
 	ui->actionE_xit->setMenuRole(QAction::QuitRole);
 #endif
+}
+
+QDataStream &operator<<(QDataStream &out, const OBSSceneItem &myObj)
+{
+	/* TODO: Actually serialise data. */
+	UNUSED_PARAMETER(myObj);
+	return out;
+}
+
+QDataStream &operator>>(QDataStream &in, const OBSSceneItem &myObj)
+{
+	/* TODO: Actually serialise data. */
+	UNUSED_PARAMETER(myObj);
+	return in;
 }
 
 static void SaveAudioDevice(const char *name, int channel, obs_data_t *parent)
@@ -1850,6 +1880,12 @@ void OBSBasic::on_actionSceneDown_triggered()
 	/* TODO */
 }
 
+void OBSBasic::on_actionSceneDragReorder(const QModelIndex &, int, int,
+		const QModelIndex &, int)
+{
+	/* TODO */
+}
+
 void OBSBasic::on_sources_currentItemChanged(QListWidgetItem *current,
 		QListWidgetItem *prev)
 {
@@ -2044,6 +2080,23 @@ void OBSBasic::on_actionSourceDown_triggered()
 {
 	OBSSceneItem item = GetCurrentSceneItem();
 	obs_sceneitem_set_order(item, OBS_ORDER_MOVE_DOWN);
+}
+
+void OBSBasic::on_actionSourceDragReorder(const QModelIndex &, int sourceStart,
+		int, const QModelIndex &, int destinationRow)
+{
+	OBSSceneItem item = GetCurrentSceneItem();
+
+	// Check if dragged up or down, dragging up is 1 off.
+	int moveCount = destinationRow - sourceStart;
+
+	if (moveCount >= 0) {
+		obs_sceneitem_set_order_position(item, ui->sources->count() -
+				destinationRow);
+	} else {
+		obs_sceneitem_set_order_position(item, ui->sources->count() -
+				destinationRow - 1);
+	}
 }
 
 void OBSBasic::on_actionMoveUp_triggered()
